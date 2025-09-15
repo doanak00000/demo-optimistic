@@ -1,13 +1,15 @@
-import React from "react";
+// app/routes/dashboard.tsx
 import { defer } from "@remix-run/node";
-import { Await, useLoaderData } from "@remix-run/react";
-
-function slowText(ms = 2500) {
-  return new Promise<string>((res) => setTimeout(() => res("This heavy docs content arrived after a delay."), ms));
-}
+import { useLoaderData } from "@remix-run/react";
+import { callApi, wrapDefer } from "../utils/deferApi";
+import { Deferred } from "../components/Deferred";
 
 export async function loader() {
-  return defer({ intro: slowText(2500) });
+  return defer({
+    title: callApi(() => Promise.resolve("📊 Dashboard Title"), 1000),
+    stats: wrapDefer(callApi(() => Promise.resolve(["User: 120", "Sales: 50"]), 2000)),
+    reports: wrapDefer(callApi(() => Promise.resolve(["Report A", "Report B"]), 3000)),
+  });
 }
 
 export default function Docs() {
@@ -15,18 +17,29 @@ export default function Docs() {
 
   return (
     <div>
-      <h1>Docs</h1>
-      <p>Small intro is visible right away; long docs stream in below.</p>
+      <Deferred data={data.title} fallback={<h2>⏳ Loading title...</h2>}>
+        {(title) => <h2>{title}</h2>}
+      </Deferred>
 
-      <React.Suspense fallback={<div className="card"><div className="skeleton" style={{width: '100%', height: '6rem'}}></div><p>Loading docs…</p></div>}>
-        <Await resolve={data.intro}>
-          {(t: string) => (
-            <div className="card">
-              <p>{t}</p>
-            </div>
-          )}
-        </Await>
-      </React.Suspense>
+      <Deferred data={data.stats} fallback={<p>Loading stats...</p>}>
+        {(stats) => (
+          <ul>
+            {stats.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        )}
+      </Deferred>
+
+      <Deferred data={data.reports} fallback={<p>Loading reports...</p>}>
+        {(reports) => (
+          <ul>
+            {reports.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        )}
+      </Deferred>
     </div>
   );
 }
