@@ -1,47 +1,53 @@
-Docs: Progressive Data Loading trong Remix (Pending UI + Deferred Data)
+Progressive Data Loading in Remix (Pending UI + Deferred Data)
 
-1. Vấn đề gốc
+1. Root Problem
 
-Trong SSR truyền thống của Remix:
-	•	Khi user click vào navbar → browser chờ server fetch toàn bộ API → server render HTML → trả về.
-	•	Nếu API chậm → UI bị block, user thấy “đứng hình”, không có feedback.
+In traditional Remix SSR:
+	•	When a user clicks on the navbar → the browser waits for the server to fetch all APIs → the server renders HTML → response is returned.
+	•	If an API is slow → the UI is blocked, and the user sees a “freeze” with no feedback.
 
-Trải nghiệm không mượt, đặc biệt khi gọi nhiều API trong 1 trang.
+This leads to a choppy experience, especially when multiple APIs are called in a single page.
 
-2. Ý tưởng giải pháp
+⸻
 
-Để giải quyết, ta áp dụng 3 kỹ thuật chính mà Remix v2 support:
+2. Solution Idea
+
+To solve this, we apply 3 main techniques supported by Remix v2:
 
 2.1. Pending UI (Optimistic Navigation)
-	•	Khi user click nav:
-	•	URL đổi ngay.
-	•	Navbar active ngay.
-	•	Có thể hiện loading indicator (progress bar).
-	•	Dùng hook useNavigation() để biết khi nào route đang “pending”.
+	•	When a user clicks navigation:
+	•	The URL changes immediately.
+	•	Navbar becomes active immediately.
+	•	A loading indicator (e.g., progress bar) can be displayed.
+	•	Use the useNavigation() hook to know when a route is “pending”.
 
 2.2. Deferred Data
-	•	Loader có thể trả về data bằng defer() → một số API trả ngay, một số API (chậm) sẽ resolve sau.
-	•	Nhờ vậy, layout & skeleton render ngay, không chờ toàn bộ API.
+	•	A loader can return data using defer() → some APIs return immediately, while others (slower ones) resolve later.
+	•	This way, the layout & skeleton render immediately without waiting for all APIs.
 
 2.3. Suspense + Fallback (Skeleton UI)
-	•	Trong UI, dùng <Suspense fallback> + <Await> để render fallback trong lúc chờ data resolve.
-	•	Skeleton/Fallback là UI tạm: có thể là spinner hoặc khung xám giả lập bố cục content.
-	•	Khi API resolve → Suspense render nội dung thật.
+	•	In UI, use <Suspense fallback> + <Await> to render a fallback while waiting for data to resolve.
+	•	Skeleton/Fallback is temporary UI: it could be a spinner or gray boxes that mimic the content layout.
+	•	Once the API resolves → Suspense renders the real content.
 
-3. Flow tổng quát
-	1.	User click nav → URL đổi, nav active ngay (Pending UI).
-	2.	Layout render ngay (SSR trả về khung).
-	3.	Các phần data (title, content, chart, report, …) gọi API thông qua defer().
-	4.	UI render skeleton/fallback trong lúc chờ API.
-	5.	Khi API resolve → Suspense render nội dung thật, skeleton biến mất.
+⸻
 
-UI progressive: route đổi ngay, data hiển thị dần theo tốc độ API.
+3. Overall Flow
+	1.	User clicks navigation → URL changes, navbar activates instantly (Pending UI).
+	2.	Layout renders immediately (SSR returns the frame).
+	3.	Data blocks (title, content, chart, report, …) call APIs via defer().
+	4.	UI shows skeleton/fallback while waiting for API responses.
+	5.	When APIs resolve → Suspense renders real content, skeleton disappears.
 
-4. Utils & Component hỗ trợ
+Progressive UI: route changes instantly, data displays gradually depending on API speed.
+
+⸻
+
+4. Supporting Utils & Components
 
 4.1. utils/deferApi.ts
 
-Giúp wrap API call (fake delay hoặc thật).
+Helps wrap API calls (with optional fake delay).
 
 // utils/deferApi.ts
 export async function callApi<T>(fn: () => Promise<T>, delay = 0): Promise<T> {
@@ -55,9 +61,12 @@ export function wrapDefer<T>(promise: Promise<T>): Promise<T> {
   return promise;
 }
 
+
+⸻
+
 4.2. components/Deferred.tsx
 
-Wrapper UI cho Suspense + Await.
+Wrapper UI for Suspense + Await.
 
 // components/Deferred.tsx
 import { Suspense } from "react";
@@ -77,7 +86,10 @@ export function Deferred<T>({ data, fallback, children }: DeferredProps<T>) {
   );
 }
 
-5. Ví dụ thực tế: Dashboard nhiều API
+
+⸻
+
+5. Real Example: Dashboard with Multiple APIs
 
 // app/routes/dashboard.tsx
 import { defer } from "@remix-run/node";
@@ -125,14 +137,19 @@ export default function Dashboard() {
   );
 }
 
-6. Lợi ích
-	•	Không block UI: route + layout render ngay.
-	•	Trải nghiệm mượt: user thấy skeleton/fallback, biết trang đang load.
-	•	Dễ maintain: dùng Deferred component chung, code gọn hơn.
-	•	Scalable: nhiều API call vẫn ổn vì mỗi block load độc lập.
 
-7. Checklist khi áp dụng vào real app
-	•	Layout (root.tsx) chỉ load data nhẹ.
-	•	API quan trọng/SEO thì load trực tiếp, API phụ/nặng thì defer.
-	•	Mỗi route chia nhỏ UI block và dùng <Deferred> để hiển thị dần.
-	•	Navbar dùng useNavigation() để highlight pending state.
+⸻
+
+6. Benefits
+	•	No UI blocking: route + layout render immediately.
+	•	Smooth UX: user sees skeleton/fallback, so they know the page is loading.
+	•	Easy to maintain: shared Deferred component keeps code clean.
+	•	Scalable: multiple API calls are fine because each block loads independently.
+
+⸻
+
+7. Checklist for Real App Usage
+	•	root.tsx layout should only load light data.
+	•	Critical/SEO APIs should load directly, heavy/secondary ones should use defer.
+	•	Split each route’s UI into blocks and use <Deferred> to progressively display.
+	•	Navbar uses useNavigation() to highlight pending state.
